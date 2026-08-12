@@ -248,11 +248,11 @@ iframe#webPreviewFrame { flex: 1; border: 0; width: 100%; height: 100%; backgrou
 
           <!-- 3. TERMINAL TAB -->
           <div class="tabContent active" id="tabTerminal">
-            <div class="terminalLog" id="terminalLog">PyMobile VS Code Terminal (v3.0)
+            <div class="terminalLog" id="terminalLog">PyMobile VS Code Terminal (v3.1)
 Type 'help' to view available commands.</div>
             <div class="terminalInputRow">
               <span class="termPrompt">pymobile@vscode:~$</span>
-              <input id="terminalInput" placeholder="python main.py, node server.js, ls, clear...">
+              <input id="terminalInput" placeholder="pip install numpy, python main.py, node server.js, ls...">
             </div>
           </div>
 
@@ -375,7 +375,7 @@ Type 'help' to view available commands.</div>
                 "index.html": '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>PyMobile Web App</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <div class="container">\n    <h1>Hello from HTML & JS Editor!</h1>\n    <p>Edit HTML, CSS, or JS and hit ▶ Run.</p>\n    <button id="btn">Click Me</button>\n  </div>\n  <script src="script.js"><\/script>\n</body>\n</html>',
                 "style.css": 'body {\n  font-family: system-ui, sans-serif;\n  background: #181825;\n  color: #cdd6f4;\n  display: grid;\n  place-items: center;\n  min-height: 100vh;\n  margin: 0;\n}\n.container {\n  text-align: center;\n  padding: 2rem;\n  background: #1e1e2e;\n  border-radius: 12px;\n  border: 1px solid #313244;\n}\nbutton {\n  padding: 10px 20px;\n  background: #89b4fa;\n  border: 0;\n  border-radius: 6px;\n  font-weight: bold;\n  cursor: pointer;\n}',
                 "script.js": '// JavaScript File\ndocument.getElementById("btn")?.addEventListener("click", () => {\n  alert("Interactive JS Working!");\n});\nconsole.log("Web Application Scripts Loaded.");',
-                "main.py": '# Python Backend Service\nimport json\n\nprint("Python Script Engine Initialized")\ndata = {"status": "ok", "port": 5000}\nprint(json.dumps(data))\n'
+                "main.py": '# Python Script with NumPy Example\nimport numpy as np\n\narr = np.array([1, 2, 3, 4, 5])\nprint("NumPy Array:", arr)\nprint("Mean:", np.mean(arr))\n'
               }
             }
           }
@@ -461,12 +461,10 @@ Type 'help' to view available commands.</div>
     const content = proj.files[proj.active] || "";
     document.getElementById("activeFile").textContent = proj.active;
     
-    // Set CodeMirror Syntax Mode & Content correctly
     const mode = getModeByFilename(proj.active);
     cmEditor.setOption("mode", mode);
     cmEditor.setValue(content);
     
-    // Refresh CodeMirror so layout renders instantly without graphical glitch
     setTimeout(() => { cmEditor.refresh(); }, 10);
     validateCodeSyntax(proj.active, content);
   }
@@ -498,7 +496,6 @@ Type 'help' to view available commands.</div>
       return;
     }
 
-    // Default Templates
     let boilerplate = "";
     if (filename.endsWith(".html")) {
       boilerplate = '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Page</title>\n</head>\n<body>\n  <h1>New HTML Page</h1>\n</body>\n</html>';
@@ -518,7 +515,6 @@ Type 'help' to view available commands.</div>
     toastMsg("Created " + filename);
   }
 
-  // Modals & Button handlers
   const fileModal = document.getElementById("fileModal");
   document.getElementById("newFileBtn").onclick = () => fileModal.classList.add("open");
   document.getElementById("cancelFile").onclick = () => fileModal.classList.remove("open");
@@ -573,7 +569,6 @@ Type 'help' to view available commands.</div>
       title.textContent = "🌐 Port :8000 — Live Web Page";
       let html = proj.files["index.html"] || proj.files[proj.active] || "<h1>No HTML Found</h1>";
 
-      // Auto-inject linked style.css and script.js if they exist in the workspace
       if (proj.files["style.css"] && !html.includes("<style>") && html.includes("style.css")) {
         html = html.replace("</head>", `<style>${proj.files["style.css"]}</style></head>`);
       }
@@ -627,7 +622,7 @@ Type 'help' to view available commands.</div>
     const proj = getActiveProject();
     proj.files[proj.active] = cmEditor.getValue();
 
-    const parts = raw.split(" ");
+    const parts = raw.split(/\s+/);
     const cmd = parts[0].toLowerCase();
     const arg = parts[1] || "";
 
@@ -636,7 +631,7 @@ Type 'help' to view available commands.</div>
       return;
     }
     if (cmd === "help") {
-      termWrite("Terminal Commands:\n • python <file.py>\n • node <file.js>\n • ls\n • cat <filename>\n • clear");
+      termWrite("Terminal Commands:\n • pip install <package>\n • python <file.py>\n • node <file.js>\n • ls\n • cat <filename>\n • clear");
       return;
     }
     if (cmd === "ls") {
@@ -649,6 +644,45 @@ Type 'help' to view available commands.</div>
       else { termWrite(`--- ${arg} ---\n` + proj.files[arg]); }
       return;
     }
+
+    // --- NEW PIP PACKAGE INSTALLER HANDLER ---
+    if (cmd === "pip") {
+      const subCmd = parts[1] ? parts[1].toLowerCase() : "";
+      let pkg = parts[2] ? parts[2].toLowerCase() : "";
+
+      if (subCmd !== "install" || !pkg) {
+        termWrite("Usage: pip install <package_name> (e.g. pip install numpy)");
+        return;
+      }
+
+      // Auto-correct common typos like "numpi" -> "numpy"
+      if (pkg === "numpi") pkg = "numpy";
+
+      if (!pyodide) {
+        termWrite("Initializing Python WASM Engine...");
+        pyodide = await loadPyodide();
+        termWrite("Python WASM Engine Ready ✓");
+      }
+
+      termWrite(`[Pip] Downloading & installing '${pkg}'...`);
+      try {
+        // Try Pyodide pre-built packages first
+        await pyodide.loadPackage(pkg);
+        termWrite(`[Pip] Successfully installed ${pkg} ✓`);
+      } catch (e) {
+        try {
+          // Fallback to micropip for standard PyPI wheels
+          await pyodide.loadPackage("micropip");
+          const micropip = pyodide.pyimport("micropip");
+          await micropip.install(pkg);
+          termWrite(`[Pip] Successfully installed ${pkg} via Micropip ✓`);
+        } catch (err) {
+          termWrite(`[Pip Error] Could not install '${pkg}': ${err.message}`);
+        }
+      }
+      return;
+    }
+
     if (cmd === "python") {
       const target = arg || proj.active;
       const code = proj.files[target] || cmEditor.getValue();
@@ -667,6 +701,7 @@ Type 'help' to view available commands.</div>
       } catch(e) { termWrite("Python Error: " + e.message); }
       return;
     }
+
     if (cmd === "node") {
       const target = arg || proj.active;
       termWrite(`$ node ${target}`);

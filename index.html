@@ -339,7 +339,7 @@ Type 'help' to view available commands.</div>
 
 <script>
 (() => {
-  const DB_KEY = "pymobile_vscode_indexeddb_v6";
+  const DB_KEY = "pymobile_vscode_indexeddb_v7";
   let state = { currentProject: "WebProject", projects: {} };
   let cmEditor = null;
   let pyodide = null;
@@ -527,14 +527,15 @@ Type 'help' to view available commands.</div>
     validateCodeSyntax(proj.active, content);
   }
 
+  // FIX 1: Only check for actual JS structural declarations to avoid false positives on Python DOM calls
   function validateCodeSyntax(filename, code) {
     const probList = document.getElementById("problemsList");
     const countBadge = document.getElementById("probCount");
 
-    if (filename.endsWith(".py") && /\b(const|let|var|console\.log|document\.)\b/.test(code)) {
+    if (filename.endsWith(".py") && /^\s*(const|let|var|function)\s+/m.test(code)) {
       probList.innerHTML = `
         <div class="problemItem">
-          <span>⚠️ <strong>Syntax Mismatch in ${filename}:</strong> JavaScript code placed inside a Python file!</span>
+          <span>⚠️ <strong>Syntax Mismatch in ${filename}:</strong> JS statements (const/let/var/function) inside a Python file.</span>
         </div>`;
       countBadge.textContent = "1";
       return;
@@ -645,7 +646,7 @@ Type 'help' to view available commands.</div>
   Object.keys(tabBtns).forEach(k => { tabBtns[k].onclick = () => switchVsCodeTab(k); });
   document.getElementById("portsQuickBtn").onclick = () => switchVsCodeTab("Ports");
 
-  // --- LIVE WEB & INLINE VIRTUAL PORTS ENGINE ---
+  // FIX 2: Enhanced Inlining for HTML Live Web Preview
   window.openVirtualPort = function(port) {
     saveAppDataQuiet();
     const proj = getActiveProject();
@@ -656,21 +657,41 @@ Type 'help' to view available commands.</div>
       title.textContent = "🌐 Port :8000 — Live Web Page";
       let html = proj.files["index.html"] || proj.files[proj.active] || "<h1>No HTML Found</h1>";
 
-      // Inline CSS automatically
-      if (proj.files["style.css"] && !html.includes("<style>") && html.includes("style.css")) {
-        html = html.replace("</head>", `<style>${proj.files["style.css"]}</style></head>`);
-      }
-      
-      // Inline JS automatically
-      if (proj.files["script.js"] && html.includes("script.js")) {
-        html = html.replace("</body>", `<script>${proj.files["script.js"]}<\/script></body>`);
-      }
+      // Dynamically replace external CSS links with internal style tags
+      Object.keys(proj.files).forEach(f => {
+        if (f.endsWith('.css')) {
+          const cssContent = proj.files[f];
+          const re = new RegExp(`<link[^>]*href=["'](?:\\.\\/)?${f}["'][^>]*>`, 'gi');
+          if (re.test(html)) {
+            html = html.replace(re, `<style>${cssContent}</style>`);
+          } else if (!html.includes(cssContent) && html.includes("</head>")) {
+            html = html.replace("</head>", `<style>${cssContent}</style></head>`);
+          }
+        }
+      });
 
-      // Automatically inline Python scripts to prevent PY0404 src fetch error
-      if (proj.files["main.py"]) {
-        html = html.replace(/<py-script\s+src=["']\.\/main\.py["']\s*><\/py-script>/gi, `<py-script>${proj.files["main.py"]}</py-script>`);
-        html = html.replace(/<script\s+type=["']py["']\s+src=["']\.\/main\.py["']\s*><\/script>/gi, `<script type="py">${proj.files["main.py"]}<\/script>`);
-      }
+      // Dynamically replace JS script tags with inline scripts
+      Object.keys(proj.files).forEach(f => {
+        if (f.endsWith('.js')) {
+          const jsContent = proj.files[f];
+          const re = new RegExp(`<script[^>]*src=["'](?:\\.\\/)?${f}["'][^>]*>\\s*<\\/script>`, 'gi');
+          if (re.test(html)) {
+            html = html.replace(re, `<script>${jsContent}<\/script>`);
+          }
+        }
+      });
+
+      // Dynamically replace PyScript tags with inline Python code
+      Object.keys(proj.files).forEach(f => {
+        if (f.endsWith('.py')) {
+          const pyContent = proj.files[f];
+          const reScript = new RegExp(`<script[^>]*type=["']py["'][^>]*src=["'](?:\\.\\/)?${f}["'][^>]*>\\s*<\\/script>`, 'gi');
+          const rePyScript = new RegExp(`<py-script[^>]*src=["'](?:\\.\\/)?${f}["'][^>]*>\\s*<\\/py-script>`, 'gi');
+          
+          html = html.replace(reScript, `<script type="py">\n${pyContent}\n<\/script>`);
+          html = html.replace(rePyScript, `<py-script>\n${pyContent}\n<\/py-script>`);
+        }
+      });
 
       iframe.srcdoc = html;
     } else if (port === 3000) {
@@ -708,6 +729,7 @@ Type 'help' to view available commands.</div>
     term.scrollTop = term.scrollHeight;
   }
 
+  // FIX 3: Real-time Terminal Execution + Properly Passing Prompts to Python Input()
   async function executeTerminalCmd(cmdStr) {
     const raw = cmdStr.trim();
     if (!raw) return;
@@ -752,7 +774,10 @@ Type 'help' to view available commands.</div>
 
       if (!pyodide) {
         termWrite("Initializing Python WASM Engine...");
-        pyodide = await loadPyodide();
+        pyodide = await loadPyodide({
+          stdout: (msg) => termWrite(msg),
+          stderr: (msg) => termWrite("[error] " + msg)
+        });
         termWrite("Python WASM Engine Ready ✓");
       }
 
@@ -777,18 +802,47 @@ Type 'help' to view available commands.</div>
       const target = arg || proj.active;
       const code = proj.files[target] || cmEditor.getValue();
       termWrite(`$ python ${target}`);
+
       if (!pyodide) {
         termWrite("Loading Python WASM Runtime...");
-        pyodide = await loadPyodide();
-        termWrite("Python Runtime Ready ✓");
+        try {
+          pyodide = await loadPyodide({
+            stdout: (msg) => termWrite(msg),
+            stderr: (msg) => termWrite("[stderr] " + msg)
+          });
+
+          // Expose browser prompt to Python stdin
+          pyodide.globals.set("js_input_prompt", (promptText) => {
+            return prompt(promptText || "Input required:") || "";
+          });
+
+          // Override Python input() to show actual prompt text in modal header
+          await pyodide.runPythonAsync(`
+import sys
+import js
+
+def custom_input(prompt_text=""):
+    prompt_str = str(prompt_text)
+    user_val = js.js_input_prompt(prompt_str)
+    return user_val
+
+import builtins
+builtins.input = custom_input
+          `);
+
+          termWrite("Python Runtime Ready ✓");
+        } catch (err) {
+          termWrite("Failed to initialize Python: " + err.message);
+          return;
+        }
       }
+
       try {
-        pyodide.runPython(`import io, sys; sys.stdout = io.StringIO(); sys.stderr = io.StringIO()`);
         await pyodide.runPythonAsync(code);
-        const stdout = pyodide.runPython("sys.stdout.getvalue()");
-        if (stdout) termWrite(stdout);
-        else termWrite("[Process finished with code 0]");
-      } catch(e) { termWrite("Python Error: " + e.message); }
+        termWrite("\n[Process finished with code 0]");
+      } catch(e) { 
+        termWrite("Python Error: " + e.message); 
+      }
       return;
     }
 
@@ -797,11 +851,14 @@ Type 'help' to view available commands.</div>
       termWrite(`$ node ${target}`);
       const code = proj.files[target] || cmEditor.getValue();
       try {
-        let logs = [];
-        const customConsole = { log: (...a) => logs.push(a.join(" ")) };
+        const customConsole = {
+          log: (...a) => termWrite(a.map(x => typeof x === 'object' ? JSON.stringify(x) : x).join(" ")),
+          error: (...a) => termWrite("[error] " + a.join(" ")),
+          warn: (...a) => termWrite("[warn] " + a.join(" "))
+        };
         const runFn = new Function("console", code);
         runFn(customConsole);
-        termWrite(logs.length > 0 ? logs.join("\n") : "[Execution finished]");
+        termWrite("[Execution finished with code 0]");
       } catch(e) { termWrite("JS Error: " + e.message); }
       return;
     }

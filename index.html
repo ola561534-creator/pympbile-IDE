@@ -1,182 +1,943 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Mobile Web File Editor</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: #11111b; color: #cdd6f4; height: 100vh; display: flex; flex-direction: column; padding: 12px; gap: 12px; }
-    
-    /* Top Toolbar */
-    .toolbar { display: flex; align-items: center; justify-content: space-between; background: #1e1e2e; padding: 10px 14px; border-radius: 8px; border: 1px solid #313244; }
-    .status { font-size: 11px; font-weight: bold; color: #a6e3a1; transition: opacity 0.3s; }
-    
-    /* File Selector Bar */
-    .file-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-    .file-tab { background: #181825; border: 1px solid #313244; color: #a6adc8; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .file-tab.active { background: #89b4fa; color: #11111b; border-color: #89b4fa; }
-    .btn-add { background: #313244; color: #89b4fa; font-weight: bold; border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#181825">
 
-    /* Action Bar (Rename, Delete, Share) */
-    .action-bar { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn-action { flex: 1; background: #1e1e2e; border: 1px solid #313244; color: #cdd6f4; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
-    .btn-action.danger { color: #f38ba8; }
-    .btn-action.primary { background: #89b4fa; color: #11111b; }
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PyMobile VSCode">
 
-    /* Text / Code Editor */
-    .editor-container { flex: 1; display: flex; flex-direction: column; }
-    textarea { width: 100%; height: 100%; background: #1e1e2e; border: 1px solid #313244; border-radius: 8px; color: #f5e0dc; padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; outline: none; resize: none; }
-  </style>
+<title>PyMobile IDE — VS Code Edition</title>
+
+<!-- External Runtimes & Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.29.2/full/pyodide.js"></script>
+
+<!-- CodeMirror Editor & Syntax Modes -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+
+<style>
+:root {
+  --vscode-bg: #1e1e2e;
+  --vscode-sidebar: #181825;
+  --vscode-editor: #11111b;
+  --vscode-panel: #181825;
+  --vscode-accent: #89b4fa;
+  --vscode-green: #a6e3a1;
+  --vscode-red: #f38ba8;
+  --vscode-yellow: #f9e2af;
+  --vscode-text: #cdd6f4;
+  --vscode-subtext: #a6adc8;
+  --vscode-border: #313244;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--vscode-bg); color: var(--vscode-text); }
+button, input, select { font: inherit; }
+button { border: 0; cursor: pointer; }
+
+.app { height: 100dvh; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
+/* Top Header */
+.topbar {
+  height: 48px; min-height: 48px; background: var(--vscode-sidebar); border-bottom: 1px solid var(--vscode-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px; z-index: 5;
+}
+.brand { display: flex; align-items: center; gap: 8px; }
+.logoMark {
+  width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #89b4fa, #cba6f7); color: #11111b; font-weight: 900; font-size: 13px;
+}
+.brandName { font-weight: 700; font-size: 14px; letter-spacing: -0.2px; }
+
+.topActions { display: flex; align-items: center; gap: 6px; }
+.saveBadge { font-size: 10px; font-weight: 800; color: var(--vscode-green); background: #11111b; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--vscode-border); }
+.iconBtn, .runBtn, .portsBtn {
+  min-width: 32px; height: 32px; border-radius: 6px; background: #313244; color: var(--vscode-text);
+  display: grid; place-items: center; font-size: 13px; padding: 0 8px; font-weight: 600;
+}
+.runBtn { background: #a6e3a1; color: #11111b; font-weight: 800; }
+.portsBtn { background: #89b4fa; color: #11111b; font-weight: 800; }
+
+.workspace { flex: 1; min-height: 0; display: flex; position: relative; overflow: hidden; }
+
+/* Sidebar */
+.sidebar {
+  width: 260px; min-width: 260px; background: var(--vscode-sidebar); border-right: 1px solid var(--vscode-border);
+  display: flex; flex-direction: column;
+}
+.sideHeader { padding: 10px; display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 11px; color: var(--vscode-subtext); letter-spacing: 0.5px; }
+.projectCard { margin: 0 8px 8px; padding: 8px; background: #1e1e2e; border-radius: 6px; border: 1px solid var(--vscode-border); display: flex; flex-direction: column; gap: 6px; }
+.projectSelect { flex: 1; padding: 5px; border-radius: 4px; border: 1px solid var(--vscode-border); background: var(--vscode-sidebar); color: var(--vscode-text); font-size: 11px; font-weight: 700; outline: 0; }
+.fileActionsRow { display: flex; gap: 4px; flex-wrap: wrap; }
+.quickTypeBtn { background: #313244; color: var(--vscode-accent); border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: 700; }
+.fileList { padding: 4px 6px; overflow: auto; flex: 1; }
+.file {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 4px;
+  background: transparent; color: var(--vscode-subtext); font-size: 12px; margin-bottom: 2px; cursor: pointer;
+}
+.file.active { background: #313244; color: #ffffff; font-weight: 600; }
+.fileLabel { text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 130px; }
+.fileItemBtns { display: flex; align-items: center; gap: 4px; }
+.fileIconBtn { background: transparent; color: var(--vscode-subtext); font-size: 11px; padding: 2px 4px; border-radius: 3px; }
+.fileIconBtn:hover { background: #1e1e2e; color: #ffffff; }
+
+/* Editor Window */
+.editorArea { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--vscode-editor); position: relative; }
+.editorTop {
+  height: 36px; min-height: 36px; background: var(--vscode-sidebar); border-bottom: 1px solid var(--vscode-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-size: 12px;
+}
+.editorWrap { flex: 1; min-height: 0; position: relative; }
+.CodeMirror { height: 100%!important; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; }
+
+/* VS CODE BOTTOM PANEL */
+.vscodePanel {
+  height: 220px; min-height: 150px; background: var(--vscode-panel); border-top: 1px solid var(--vscode-border);
+  display: flex; flex-direction: column;
+}
+.panelTabsHeader {
+  height: 34px; background: var(--vscode-sidebar); border-bottom: 1px solid var(--vscode-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 8px;
+}
+.panelTabs { display: flex; align-items: center; gap: 2px; }
+.tabBtn {
+  background: transparent; color: var(--vscode-subtext); padding: 6px 10px; font-size: 11px; font-weight: 700;
+  border-bottom: 2px solid transparent; letter-spacing: 0.3px; text-transform: uppercase;
+}
+.tabBtn.active { color: #ffffff; border-bottom-color: var(--vscode-accent); background: var(--vscode-panel); }
+.tabBadge { background: #313244; color: var(--vscode-text); border-radius: 10px; padding: 1px 5px; font-size: 9px; margin-left: 4px; }
+
+.panelBody { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.tabContent { display: none; width: 100%; height: 100%; flex-direction: column; padding: 8px; }
+.tabContent.active { display: flex; }
+
+/* Terminal Tab Content */
+.terminalLog { flex: 1; overflow: auto; color: var(--vscode-text); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; padding-bottom: 4px; }
+.terminalInputRow { height: 32px; border-top: 1px solid var(--vscode-border); display: flex; align-items: center; gap: 6px; padding: 0 4px; }
+.termPrompt { color: var(--vscode-green); font-weight: bold; font-family: ui-monospace, monospace; font-size: 12px; }
+#terminalInput { flex: 1; background: transparent; border: 0; outline: 0; color: #ffffff; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Ports Tab Content */
+.portsTable { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
+.portsTable th { background: #1e1e2e; color: var(--vscode-subtext); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--vscode-border); }
+.portsTable td { padding: 6px 8px; border-bottom: 1px solid var(--vscode-border); color: var(--vscode-text); }
+.statusDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-green); margin-right: 4px; }
+.openPortBtn { background: var(--vscode-accent); color: #11111b; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 10px; }
+
+/* Problems & Output Tabs */
+.problemsList, .outputLog { flex: 1; overflow: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.problemItem { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; color: var(--vscode-red); }
+
+/* Live Web Browser Preview Container */
+.previewContainer { position: absolute; inset: 0; background: #ffffff; z-index: 20; display: none; flex-direction: column; }
+.previewContainer.open { display: flex; }
+.previewHeader { height: 40px; background: var(--vscode-sidebar); border-bottom: 1px solid var(--vscode-border); display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-size: 12px; color: #ffffff; }
+iframe#webPreviewFrame { flex: 1; border: 0; width: 100%; height: 100%; background: #ffffff; }
+
+/* Mobile Bottom Nav */
+.mobileNav { display: none; }
+@media(max-width: 700px) {
+  .sidebar { width: 100%; display: none; }
+  .mobileNav { display: flex; height: 48px; background: var(--vscode-sidebar); border-top: 1px solid var(--vscode-border); align-items: center; justify-content: space-around; z-index: 8; }
+  .navItem { background: transparent; color: var(--vscode-subtext); display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; }
+  .navItem.active { color: var(--vscode-accent); font-weight: 700; }
+}
+
+/* Modals & Toast */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+.modal.open { display: flex; }
+.card { width: min(500px, 100%); background: var(--vscode-sidebar); color: var(--vscode-text); border-radius: 14px 14px 0 0; padding: 16px; border-top: 1px solid var(--vscode-border); }
+.card input { width: 100%; padding: 10px; border: 1px solid var(--vscode-border); border-radius: 6px; background: #1e1e2e; color: #ffffff; margin-top: 8px; }
+.cardActions { display: flex; gap: 8px; margin-top: 12px; }
+.action { flex: 1; padding: 10px; border-radius: 6px; background: #313244; font-weight: 700; text-align: center; color: #ffffff; }
+.action.primary { background: var(--vscode-accent); color: #11111b; }
+.toast { position: fixed; left: 50%; bottom: 60px; transform: translate(-50%, 15px); opacity: 0; pointer-events: none; background: #313244; color: #ffffff; padding: 8px 14px; border-radius: 8px; font-size: 12px; z-index: 30; transition: .2s; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
 </head>
+
 <body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logoMark">VS</div>
+      <div class="brandName">PyMobile IDE</div>
+    </div>
+    <div class="topActions">
+      <span id="saveStatusBadge" class="saveBadge">Saved ✓</span>
+      <button class="iconBtn" id="shareBtn" title="Share Active File">📤</button>
+      <button class="iconBtn" id="downloadBtn" title="Download File">📥</button>
+      <button class="iconBtn" id="saveBtn" title="Manual Save All">💾</button>
+      <button class="portsBtn" id="portsQuickBtn">🌐 Ports</button>
+      <button class="runBtn" id="runBtn">▶ Run</button>
+    </div>
+  </header>
 
-  <!-- Top Status -->
-  <div class="toolbar">
-    <strong id="currentFileName" style="font-size: 14px;">main.py</strong>
-    <span id="saveStatus" class="status">Saved</span>
+  <main class="workspace">
+    <aside class="sidebar">
+      <div class="sideHeader">
+        <span>EXPLORER</span>
+        <div>
+          <button id="newFileBtn" style="background:var(--vscode-accent);color:#11111b;border-radius:4px;padding:3px 6px;font-size:10px;font-weight:800;margin-right:4px">+ File</button>
+          <button id="newProjectBtn" style="background:#313244;color:#fff;border-radius:4px;padding:3px 6px;font-size:10px;font-weight:800">+ Proj</button>
+        </div>
+      </div>
+      <div class="projectCard">
+        <div style="display:flex;align-items:center;gap:4px">
+          <select class="projectSelect" id="projectSelectDropdown"></select>
+          <button id="deleteProjectBtn" style="background:transparent;color:var(--vscode-red);padding:4px;" title="Delete Project">🗑</button>
+        </div>
+        <div class="fileActionsRow">
+          <button class="quickTypeBtn" id="quickHtml">+ HTML</button>
+          <button class="quickTypeBtn" id="quickJs">+ JS</button>
+          <button class="quickTypeBtn" id="quickCss">+ CSS</button>
+          <button class="quickTypeBtn" id="quickPy">+ PY</button>
+        </div>
+      </div>
+      <div class="fileList" id="fileList"></div>
+    </aside>
+
+    <section class="editorArea">
+      <div class="editorTop">
+        <span id="activeFile">index.html</span>
+        <button id="filesBtn" style="background:#313244;color:#fff;border-radius:4px;padding:3px 8px;font-size:11px">Files</button>
+      </div>
+
+      <div class="editorWrap">
+        <textarea id="editor"></textarea>
+
+        <!-- Live Web Browser Output Window -->
+        <div class="previewContainer" id="previewContainer">
+          <div class="previewHeader">
+            <span id="previewTitle">🌐 Live Web Preview (Port 8000)</span>
+            <button id="closePreviewBtn" style="background:#313244;color:#fff;border-radius:4px;padding:3px 8px;font-size:11px">✕ Close</button>
+          </div>
+          <iframe id="webPreviewFrame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+        </div>
+      </div>
+
+      <!-- VS CODE BOTTOM PANEL -->
+      <section class="vscodePanel">
+        <div class="panelTabsHeader">
+          <div class="panelTabs">
+            <button class="tabBtn" id="tabBtnProblems">Problems <span class="tabBadge" id="probCount">0</span></button>
+            <button class="tabBtn" id="tabBtnOutput">Output</button>
+            <button class="tabBtn active" id="tabBtnTerminal">Terminal</button>
+            <button class="tabBtn" id="tabBtnPorts">Ports <span class="tabBadge" style="background:var(--vscode-green);color:#11111b">3</span></button>
+          </div>
+          <button id="clearPanelBtn" style="background:transparent;color:var(--vscode-subtext);font-size:11px">Clear</button>
+        </div>
+
+        <div class="panelBody">
+          <!-- 1. PROBLEMS TAB -->
+          <div class="tabContent" id="tabProblems">
+            <div class="problemsList" id="problemsList">
+              <div style="color:var(--vscode-subtext)">No problems detected in active file.</div>
+            </div>
+          </div>
+
+          <!-- 2. OUTPUT TAB -->
+          <div class="tabContent" id="tabOutput">
+            <div class="outputLog" id="outputLog">[System] PyMobile Web & Code Engine Initialized.</div>
+          </div>
+
+          <!-- 3. TERMINAL TAB -->
+          <div class="tabContent active" id="tabTerminal">
+            <div class="terminalLog" id="terminalLog">PyMobile VS Code Terminal (v3.1)
+Type 'help' to view available commands.</div>
+            <div class="terminalInputRow">
+              <span class="termPrompt">pymobile@vscode:~$</span>
+              <input id="terminalInput" placeholder="pip install numpy, python main.py, node server.js, ls...">
+            </div>
+          </div>
+
+          <!-- 4. PORTS TAB -->
+          <div class="tabContent" id="tabPorts">
+            <table class="portsTable">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Protocol</th>
+                  <th>Address</th>
+                  <th>Service</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>:8000</strong></td>
+                  <td>HTTP</td>
+                  <td>localhost:8000</td>
+                  <td><span class="statusDot"></span>HTML/CSS/JS Live Web</td>
+                  <td><button class="openPortBtn" onclick="openVirtualPort(8000)">Open Browser</button></td>
+                </tr>
+                <tr>
+                  <td><strong>:3000</strong></td>
+                  <td>HTTP</td>
+                  <td>localhost:3000</td>
+                  <td><span class="statusDot"></span>Frontend App Server</td>
+                  <td><button class="openPortBtn" onclick="openVirtualPort(3000)">Open Browser</button></td>
+                </tr>
+                <tr>
+                  <td><strong>:5000</strong></td>
+                  <td>HTTP</td>
+                  <td>localhost:5000</td>
+                  <td><span class="statusDot"></span>Node.js Backend REST API</td>
+                  <td><button class="openPortBtn" onclick="openVirtualPort(5000)">Open Browser</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <nav class="mobileNav">
+    <button class="navItem active" id="navCode">Code</button>
+    <button class="navItem" id="navFiles">Files</button>
+    <button class="navItem" id="navTerminal">Terminal</button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- New File Modal -->
+<div class="modal" id="fileModal">
+  <div class="card">
+    <h3>Create New File</h3>
+    <input id="filenameInput" placeholder="e.g. index.html, style.css, app.js, main.py">
+    <div class="cardActions">
+      <button class="action" id="cancelFile">Cancel</button>
+      <button class="action primary" id="createFileSubmit">Create File</button>
+    </div>
   </div>
+</div>
 
-  <!-- File List Tabs -->
-  <div class="file-bar" id="fileBar"></div>
-
-  <!-- Action Controls -->
-  <div class="action-bar">
-    <button class="btn-action" onclick="renameFile()">✏️ Rename</button>
-    <button class="btn-action danger" onclick="deleteFile()">🗑️ Delete</button>
-    <button class="btn-action" onclick="shareFile()">📤 Share</button>
-    <button class="btn-action primary" onclick="exportFile()">💾 Download</button>
+<!-- New Project Modal -->
+<div class="modal" id="projectModal">
+  <div class="card">
+    <h3>Create New Project</h3>
+    <input id="projectInput" placeholder="Project Name">
+    <div class="cardActions">
+      <button class="action" id="cancelProject">Cancel</button>
+      <button class="action primary" id="createProject">Create</button>
+    </div>
   </div>
+</div>
 
-  <!-- Live Editor -->
-  <div class="editor-container">
-    <textarea id="editor" placeholder="Type code or notes here..." spellcheck="false"></textarea>
-  </div>
+<script>
+(() => {
+  const DB_KEY = "pymobile_vscode_indexeddb_v6";
+  let state = { currentProject: "WebProject", projects: {} };
+  let cmEditor = null;
+  let pyodide = null;
+  let autoSaveTimer = null;
 
-  <script>
-    // 1. Initial Storage Setup
-    let files = JSON.parse(localStorage.getItem('pymobile_editor_files')) || {
-      'main.py': '# Python Live File\nprint("Auto-saving active!")',
-      'notes.txt': 'Project design specifications'
-    };
-    let activeFile = localStorage.getItem('pymobile_active_file') || 'main.py';
+  // Initialize CodeMirror Editor
+  cmEditor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+    mode: "htmlmixed",
+    theme: "dracula",
+    lineNumbers: true,
+    tabSize: 2,
+    lineWrapping: true,
+    autoCloseTags: true,
+    autoCloseBrackets: true
+  });
 
-    const editor = document.getElementById('editor');
-    const status = document.getElementById('saveStatus');
-    const currentFileNameDisplay = document.getElementById('currentFileName');
+  localforage.config({ name: "PyMobileIDE", storeName: "vscode_workspace" });
 
-    // 2. Load Active File Content
-    function loadFile(fileName) {
-      if (!files[fileName]) {
-        fileName = Object.keys(files)[0] || 'main.py';
-      }
-      activeFile = fileName;
-      localStorage.setItem('pymobile_active_file', activeFile);
-      currentFileNameDisplay.textContent = activeFile;
-      editor.value = files[activeFile] || '';
-      renderTabs();
+  function setSaveStatus(text, color) {
+    const badge = document.getElementById("saveStatusBadge");
+    if (badge) {
+      badge.textContent = text;
+      badge.style.color = color;
     }
+  }
 
-    // 3. Auto-Save as You Type
-    editor.addEventListener('input', () => {
-      status.textContent = 'Saving...';
-      status.style.color = '#f9e2af';
-      
-      files[activeFile] = editor.value;
-      localStorage.setItem('pymobile_editor_files', JSON.stringify(files));
+  // Live typing auto-save with debounce
+  cmEditor.on("change", () => {
+    const proj = getActiveProject();
+    if (proj && proj.active) {
+      proj.files[proj.active] = cmEditor.getValue();
+      validateCodeSyntax(proj.active, cmEditor.getValue());
 
-      setTimeout(() => {
-        status.textContent = 'Saved';
-        status.style.color = '#a6e3a1';
+      setSaveStatus("Saving...", "var(--vscode-yellow)");
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(async () => {
+        await saveAppDataQuiet();
+        setSaveStatus("Saved ✓", "var(--vscode-green)");
       }, 300);
+    }
+  });
+
+  // Save immediately on page unload or reload
+  window.addEventListener("beforeunload", () => {
+    const proj = getActiveProject();
+    if (proj && proj.active) {
+      proj.files[proj.active] = cmEditor.getValue();
+      localforage.setItem(DB_KEY, state);
+    }
+  });
+
+  async function loadAppData() {
+    try {
+      const saved = await localforage.getItem(DB_KEY);
+      if (saved && saved.projects && Object.keys(saved.projects).length > 0) {
+        state = saved;
+      } else {
+        state = {
+          currentProject: "WebProject",
+          projects: {
+            "WebProject": {
+              active: "index.html",
+              files: {
+                "index.html": '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>PyMobile Web App</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <div class="container">\n    <h1>Hello from HTML & JS Editor!</h1>\n    <p>Edit HTML, CSS, or JS and hit ▶ Run.</p>\n    <button id="btn">Click Me</button>\n  </div>\n  <script src="script.js"><\/script>\n</body>\n</html>',
+                "style.css": 'body {\n  font-family: system-ui, sans-serif;\n  background: #181825;\n  color: #cdd6f4;\n  display: grid;\n  place-items: center;\n  min-height: 100vh;\n  margin: 0;\n}\n.container {\n  text-align: center;\n  padding: 2rem;\n  background: #1e1e2e;\n  border-radius: 12px;\n  border: 1px solid #313244;\n}\nbutton {\n  padding: 10px 20px;\n  background: #89b4fa;\n  border: 0;\n  border-radius: 6px;\n  font-weight: bold;\n  cursor: pointer;\n}',
+                "script.js": '// JavaScript File\ndocument.getElementById("btn")?.addEventListener("click", () => {\n  alert("Interactive JS Working!");\n});\nconsole.log("Web Application Scripts Loaded.");',
+                "main.py": '# Python Script with NumPy Example\nimport numpy as np\n\narr = np.array([1, 2, 3, 4, 5])\nprint("NumPy Array:", arr)\nprint("Mean:", np.mean(arr))\n'
+              }
+            }
+          }
+        };
+        await saveAppDataQuiet();
+      }
+    } catch(e) { console.error(e); }
+
+    populateProjectDropdown();
+    renderFiles();
+    openActiveFile();
+  }
+
+  async function saveAppDataQuiet() {
+    const proj = getActiveProject();
+    if (proj && proj.active) {
+      proj.files[proj.active] = cmEditor.getValue();
+    }
+    await localforage.setItem(DB_KEY, state);
+  }
+
+  async function saveAppData() {
+    await saveAppDataQuiet();
+    setSaveStatus("Saved ✓", "var(--vscode-green)");
+    toastMsg("Workspace Saved ✓");
+  }
+
+  function getActiveProject() { return state.projects[state.currentProject]; }
+
+  function populateProjectDropdown() {
+    const dropdown = document.getElementById("projectSelectDropdown");
+    dropdown.innerHTML = "";
+    Object.keys(state.projects).forEach(pName => {
+      const opt = document.createElement("option");
+      opt.value = pName;
+      opt.textContent = pName;
+      if (pName === state.currentProject) opt.selected = true;
+      dropdown.appendChild(opt);
     });
+  }
 
-    // 4. Render File Tabs
-    function renderTabs() {
-      const fileBar = document.getElementById('fileBar');
-      fileBar.innerHTML = '';
+  function renderFiles() {
+    const proj = getActiveProject();
+    const list = document.getElementById("fileList");
+    list.innerHTML = "";
+    if (!proj || !proj.files) return;
+
+    Object.keys(proj.files).forEach(fname => {
+      const div = document.createElement("div");
+      div.className = "file" + (fname === proj.active ? " active" : "");
       
-      Object.keys(files).forEach(fileName => {
-        const tab = document.createElement('button');
-        tab.className = `file-tab ${fileName === activeFile ? 'active' : ''}`;
-        tab.textContent = fileName;
-        tab.onclick = () => loadFile(fileName);
-        fileBar.appendChild(tab);
-      });
+      const label = document.createElement("span");
+      label.className = "fileLabel";
+      label.textContent = fname;
+      div.appendChild(label);
 
-      const addBtn = document.createElement('button');
-      addBtn.className = 'btn-add';
-      addBtn.textContent = '+ New File';
-      addBtn.onclick = createNewFile;
-      fileBar.appendChild(addBtn);
-    }
+      const btnsGroup = document.createElement("div");
+      btnsGroup.className = "fileItemBtns";
 
-    // 5. Create New File
-    function createNewFile() {
-      const name = prompt('Enter new file name:', 'script.py');
-      if (name && name.trim() !== '') {
-        const cleanName = name.trim();
-        files[cleanName] = '';
-        localStorage.setItem('pymobile_editor_files', JSON.stringify(files));
-        loadFile(cleanName);
+      // Rename button
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "fileIconBtn";
+      renameBtn.textContent = "✏️";
+      renameBtn.title = "Rename File";
+      renameBtn.onclick = (e) => {
+        e.stopPropagation();
+        renameFile(fname);
+      };
+      btnsGroup.appendChild(renameBtn);
+
+      // Share button
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "fileIconBtn";
+      shareBtn.textContent = "📤";
+      shareBtn.title = "Share File";
+      shareBtn.onclick = (e) => {
+        e.stopPropagation();
+        shareSingleFile(fname);
+      };
+      btnsGroup.appendChild(shareBtn);
+
+      // Delete button
+      if (Object.keys(proj.files).length > 1) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "fileIconBtn";
+        delBtn.textContent = "🗑️";
+        delBtn.title = "Delete File";
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteFile(fname);
+        };
+        btnsGroup.appendChild(delBtn);
       }
+
+      div.appendChild(btnsGroup);
+
+      div.onclick = () => {
+        proj.files[proj.active] = cmEditor.getValue();
+        proj.active = fname;
+        openActiveFile(); renderFiles();
+        if(innerWidth <= 700) showCode();
+      };
+      list.appendChild(div);
+    });
+  }
+
+  function getModeByFilename(fname) {
+    if (fname.endsWith(".html") || fname.endsWith(".htm")) return "htmlmixed";
+    if (fname.endsWith(".js")) return "javascript";
+    if (fname.endsWith(".css")) return "css";
+    if (fname.endsWith(".py")) return "python";
+    if (fname.endsWith(".json")) return "javascript";
+    return "htmlmixed";
+  }
+
+  function openActiveFile() {
+    const proj = getActiveProject();
+    if (!proj) return;
+    if (!proj.files[proj.active]) {
+      proj.active = Object.keys(proj.files)[0] || "index.html";
+    }
+    const content = proj.files[proj.active] || "";
+    document.getElementById("activeFile").textContent = proj.active;
+    
+    const mode = getModeByFilename(proj.active);
+    cmEditor.setOption("mode", mode);
+    cmEditor.setValue(content);
+    
+    setTimeout(() => { cmEditor.refresh(); }, 10);
+    validateCodeSyntax(proj.active, content);
+  }
+
+  function validateCodeSyntax(filename, code) {
+    const probList = document.getElementById("problemsList");
+    const countBadge = document.getElementById("probCount");
+
+    if (filename.endsWith(".py") && /\b(const|let|var|console\.log|document\.)\b/.test(code)) {
+      probList.innerHTML = `
+        <div class="problemItem">
+          <span>⚠️ <strong>Syntax Mismatch in ${filename}:</strong> JavaScript code placed inside a Python file!</span>
+        </div>`;
+      countBadge.textContent = "1";
+      return;
+    }
+    probList.innerHTML = `<div style="color:var(--vscode-subtext)">No problems detected in active file.</div>`;
+    countBadge.textContent = "0";
+  }
+
+  // --- FILE OPERATIONS: RENAME, DELETE, SHARE, CREATE ---
+  function renameFile(oldName) {
+    const proj = getActiveProject();
+    if (!proj || !proj.files[oldName]) return;
+    const newName = prompt("Enter new filename:", oldName);
+    if (!newName || newName.trim() === "" || newName === oldName) return;
+    const cleanName = newName.trim();
+    if (proj.files[cleanName] !== undefined) {
+      toastMsg("File with this name already exists!");
+      return;
     }
 
-    // 6. Rename Active File
-    function renameFile() {
-      const newName = prompt('Enter new file name:', activeFile);
-      if (newName && newName.trim() !== '' && newName !== activeFile) {
-        const cleanName = newName.trim();
-        files[cleanName] = files[activeFile];
-        delete files[activeFile];
-        localStorage.setItem('pymobile_editor_files', JSON.stringify(files));
-        loadFile(cleanName);
+    const content = proj.files[oldName];
+    delete proj.files[oldName];
+    proj.files[cleanName] = content;
+    if (proj.active === oldName) {
+      proj.active = cleanName;
+    }
+    saveAppDataQuiet();
+    renderFiles();
+    openActiveFile();
+    toastMsg(`Renamed to ${cleanName}`);
+  }
+
+  function deleteFile(fname) {
+    const proj = getActiveProject();
+    if (!proj) return;
+    if (Object.keys(proj.files).length <= 1) {
+      toastMsg("Cannot delete the only file!");
+      return;
+    }
+    if (confirm(`Delete ${fname}?`)) {
+      delete proj.files[fname];
+      if (proj.active === fname) {
+        proj.active = Object.keys(proj.files)[0];
       }
+      saveAppDataQuiet();
+      renderFiles();
+      openActiveFile();
+      toastMsg(`Deleted ${fname}`);
+    }
+  }
+
+  async function shareSingleFile(targetName) {
+    const proj = getActiveProject();
+    if (!proj) return;
+    const filename = targetName || proj.active;
+    const content = proj.files[filename] || cmEditor.getValue();
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: filename,
+          text: content
+        });
+        toastMsg("Shared " + filename);
+        return;
+      } catch (err) {}
+    }
+    try {
+      await navigator.clipboard.writeText(content);
+      toastMsg("Copied code to clipboard!");
+    } catch(err) {
+      downloadCurrentFile();
+    }
+  }
+
+  function createNewFile(filename) {
+    if (!filename) return;
+    filename = filename.trim();
+    const proj = getActiveProject();
+    
+    if (proj.files[filename] !== undefined) {
+      toastMsg("File already exists!");
+      return;
     }
 
-    // 7. Delete Active File
-    function deleteFile() {
-      if (Object.keys(files).length <= 1) {
-        alert('You must keep at least one file!');
+    let boilerplate = "";
+    if (filename.endsWith(".html")) {
+      boilerplate = '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Page</title>\n</head>\n<body>\n  <h1>New HTML Page</h1>\n</body>\n</html>';
+    } else if (filename.endsWith(".css")) {
+      boilerplate = '/* CSS Stylesheet */\nbody {\n  background-color: #181825;\n  color: #fff;\n}';
+    } else if (filename.endsWith(".js")) {
+      boilerplate = '// JavaScript File\nconsole.log("Initialized ' + filename + '");';
+    } else if (filename.endsWith(".py")) {
+      boilerplate = '# Python Script\nprint("Executing ' + filename + '")';
+    }
+
+    proj.files[filename] = boilerplate;
+    proj.active = filename;
+    saveAppDataQuiet();
+    renderFiles();
+    openActiveFile();
+    toastMsg("Created " + filename);
+  }
+
+  const fileModal = document.getElementById("fileModal");
+  document.getElementById("newFileBtn").onclick = () => fileModal.classList.add("open");
+  document.getElementById("cancelFile").onclick = () => fileModal.classList.remove("open");
+  document.getElementById("createFileSubmit").onclick = () => {
+    const input = document.getElementById("filenameInput");
+    if (input.value) {
+      createNewFile(input.value);
+      input.value = "";
+      fileModal.classList.remove("open");
+    }
+  };
+
+  document.getElementById("quickHtml").onclick = () => createNewFile("page_" + Date.now().toString().slice(-4) + ".html");
+  document.getElementById("quickJs").onclick = () => createNewFile("script_" + Date.now().toString().slice(-4) + ".js");
+  document.getElementById("quickCss").onclick = () => createNewFile("style_" + Date.now().toString().slice(-4) + ".css");
+  document.getElementById("quickPy").onclick = () => createNewFile("main_" + Date.now().toString().slice(-4) + ".py");
+
+  // VS Code Tabs
+  const tabs = {
+    Problems: document.getElementById("tabProblems"),
+    Output: document.getElementById("tabOutput"),
+    Terminal: document.getElementById("tabTerminal"),
+    Ports: document.getElementById("tabPorts")
+  };
+  const tabBtns = {
+    Problems: document.getElementById("tabBtnProblems"),
+    Output: document.getElementById("tabBtnOutput"),
+    Terminal: document.getElementById("tabBtnTerminal"),
+    Ports: document.getElementById("tabBtnPorts")
+  };
+
+  function switchVsCodeTab(tabName) {
+    Object.keys(tabs).forEach(k => {
+      tabs[k].classList.remove("active");
+      tabBtns[k].classList.remove("active");
+    });
+    tabs[tabName].classList.add("active");
+    tabBtns[tabName].classList.add("active");
+  }
+
+  Object.keys(tabBtns).forEach(k => { tabBtns[k].onclick = () => switchVsCodeTab(k); });
+  document.getElementById("portsQuickBtn").onclick = () => switchVsCodeTab("Ports");
+
+  // --- LIVE WEB & VIRTUAL PORTS ENGINE ---
+  window.openVirtualPort = function(port) {
+    saveAppDataQuiet();
+    const proj = getActiveProject();
+    const iframe = document.getElementById("webPreviewFrame");
+    const title = document.getElementById("previewTitle");
+
+    if (port === 8000) {
+      title.textContent = "🌐 Port :8000 — Live Web Page";
+      let html = proj.files["index.html"] || proj.files[proj.active] || "<h1>No HTML Found</h1>";
+
+      if (proj.files["style.css"] && !html.includes("<style>") && html.includes("style.css")) {
+        html = html.replace("</head>", `<style>${proj.files["style.css"]}</style></head>`);
+      }
+      if (proj.files["script.js"] && html.includes("script.js")) {
+        html = html.replace("</body>", `<script>${proj.files["script.js"]}<\/script></body>`);
+      }
+
+      iframe.srcdoc = html;
+    } else if (port === 3000) {
+      title.textContent = "🌐 Port :3000 — Frontend App";
+      iframe.srcdoc = `<!DOCTYPE html><html><body style="background:#181825;color:#fff;font-family:sans-serif;padding:20px;"><h2>App Server Running on Port 3000</h2></body></html>`;
+    } else if (port === 5000) {
+      title.textContent = "🌐 Port :5000 — Node.js REST API";
+      iframe.srcdoc = `<!DOCTYPE html><html><body style="background:#181825;color:#89b4fa;font-family:monospace;padding:20px;"><h3>[Port 5000 API Online]</h3><pre>{"status": "active", "service": "express-api"}</pre></body></html>`;
+    }
+    document.getElementById("previewContainer").classList.add("open");
+  };
+
+  document.getElementById("closePreviewBtn").onclick = () => {
+    document.getElementById("previewContainer").classList.remove("open");
+  };
+
+  // Run Button Logic
+  document.getElementById("runBtn").onclick = () => {
+    const proj = getActiveProject();
+    if (proj.active.endsWith(".html") || proj.active.endsWith(".css")) {
+      openVirtualPort(8000);
+    } else if (proj.active.endsWith(".py")) {
+      switchVsCodeTab("Terminal");
+      executeTerminalCmd("python " + proj.active);
+    } else if (proj.active.endsWith(".js")) {
+      switchVsCodeTab("Terminal");
+      executeTerminalCmd("node " + proj.active);
+    } else {
+      openVirtualPort(8000);
+    }
+  };
+
+  // Terminal Execution Commands
+  function termWrite(msg) {
+    const term = document.getElementById("terminalLog");
+    term.textContent += "\n" + msg;
+    term.scrollTop = term.scrollHeight;
+  }
+
+  async function executeTerminalCmd(cmdStr) {
+    const raw = cmdStr.trim();
+    if (!raw) return;
+    termWrite("pymobile@vscode:~$ " + raw);
+
+    const proj = getActiveProject();
+    proj.files[proj.active] = cmEditor.getValue();
+
+    const parts = raw.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+    const arg = parts[1] || "";
+
+    if (cmd === "clear") {
+      document.getElementById("terminalLog").textContent = "Terminal cleared.";
+      return;
+    }
+    if (cmd === "help") {
+      termWrite("Terminal Commands:\n • pip install <package>\n • python <file.py>\n • node <file.js>\n • ls\n • cat <filename>\n • clear");
+      return;
+    }
+    if (cmd === "ls") {
+      const filesStr = Object.keys(proj.files).map(f => `  ${f}`).join("\n");
+      termWrite("Workspace Files:\n" + filesStr);
+      return;
+    }
+    if (cmd === "cat") {
+      if (!arg || !proj.files[arg]) { termWrite("cat: File not found."); }
+      else { termWrite(`--- ${arg} ---\n` + proj.files[arg]); }
+      return;
+    }
+
+    if (cmd === "pip") {
+      const subCmd = parts[1] ? parts[1].toLowerCase() : "";
+      let pkg = parts[2] ? parts[2].toLowerCase() : "";
+
+      if (subCmd !== "install" || !pkg) {
+        termWrite("Usage: pip install <package_name> (e.g. pip install numpy)");
         return;
       }
-      if (confirm(`Delete ${activeFile}?`)) {
-        delete files[activeFile];
-        localStorage.setItem('pymobile_editor_files', JSON.stringify(files));
-        const nextFile = Object.keys(files)[0];
-        loadFile(nextFile);
-      }
-    }
 
-    // 8. Share File (iPhone Native Share Sheet)
-    async function shareFile() {
-      const content = files[activeFile];
-      if (navigator.share) {
+      if (pkg === "numpi") pkg = "numpy";
+
+      if (!pyodide) {
+        termWrite("Initializing Python WASM Engine...");
+        pyodide = await loadPyodide();
+        termWrite("Python WASM Engine Ready ✓");
+      }
+
+      termWrite(`[Pip] Downloading & installing '${pkg}'...`);
+      try {
+        await pyodide.loadPackage(pkg);
+        termWrite(`[Pip] Successfully installed ${pkg} ✓`);
+      } catch (e) {
         try {
-          await navigator.share({
-            title: activeFile,
-            text: content
-          });
+          await pyodide.loadPackage("micropip");
+          const micropip = pyodide.pyimport("micropip");
+          await micropip.install(pkg);
+          termWrite(`[Pip] Successfully installed ${pkg} via Micropip ✓`);
         } catch (err) {
-          console.log('Share canceled');
+          termWrite(`[Pip Error] Could not install '${pkg}': ${err.message}`);
         }
-      } else {
-        navigator.clipboard.writeText(content);
-        alert('File contents copied to clipboard!');
       }
+      return;
     }
 
-    // 9. Manual Export / Download File
-    function exportFile() {
-      const blob = new Blob([files[activeFile]], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = activeFile;
-      a.click();
+    if (cmd === "python") {
+      const target = arg || proj.active;
+      const code = proj.files[target] || cmEditor.getValue();
+      termWrite(`$ python ${target}`);
+      if (!pyodide) {
+        termWrite("Loading Python WASM Runtime...");
+        pyodide = await loadPyodide();
+        termWrite("Python Runtime Ready ✓");
+      }
+      try {
+        pyodide.runPython(`import io, sys; sys.stdout = io.StringIO(); sys.stderr = io.StringIO()`);
+        await pyodide.runPythonAsync(code);
+        const stdout = pyodide.runPython("sys.stdout.getvalue()");
+        if (stdout) termWrite(stdout);
+        else termWrite("[Process finished with code 0]");
+      } catch(e) { termWrite("Python Error: " + e.message); }
+      return;
     }
 
-    // Initial Load
-    loadFile(activeFile);
-  </script>
+    if (cmd === "node") {
+      const target = arg || proj.active;
+      termWrite(`$ node ${target}`);
+      const code = proj.files[target] || cmEditor.getValue();
+      try {
+        let logs = [];
+        const customConsole = { log: (...a) => logs.push(a.join(" ")) };
+        const runFn = new Function("console", code);
+        runFn(customConsole);
+        termWrite(logs.length > 0 ? logs.join("\n") : "[Execution finished]");
+      } catch(e) { termWrite("JS Error: " + e.message); }
+      return;
+    }
+    termWrite(`Command not recognized: '${cmd}'. Type 'help'.`);
+  }
+
+  document.getElementById("terminalInput").addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") {
+      const el = document.getElementById("terminalInput");
+      const val = el.value; el.value = "";
+      await executeTerminalCmd(val);
+    }
+  });
+
+  document.getElementById("clearPanelBtn").onclick = () => {
+    document.getElementById("terminalLog").textContent = "";
+    document.getElementById("outputLog").textContent = "";
+  };
+
+  // Download File to Local Storage
+  async function downloadCurrentFile() {
+    const proj = getActiveProject();
+    if (!proj || !proj.active) return;
+    const filename = proj.active;
+    const content = cmEditor.getValue();
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    toastMsg("Downloaded " + filename);
+  }
+
+  function toastMsg(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 1600);
+  }
+
+  document.getElementById("saveBtn").onclick = saveAppData;
+  document.getElementById("shareBtn").onclick = () => shareSingleFile();
+  document.getElementById("downloadBtn").onclick = downloadCurrentFile;
+
+  // Project Switcher
+  document.getElementById("projectSelectDropdown").onchange = (e) => {
+    saveAppDataQuiet();
+    state.currentProject = e.target.value;
+    const proj = getActiveProject();
+    if (!proj.active || !proj.files[proj.active]) proj.active = Object.keys(proj.files)[0];
+    populateProjectDropdown(); renderFiles(); openActiveFile();
+  };
+
+  // New Project
+  const projectModal = document.getElementById("projectModal");
+  document.getElementById("newProjectBtn").onclick = () => projectModal.classList.add("open");
+  document.getElementById("cancelProject").onclick = () => projectModal.classList.remove("open");
+  document.getElementById("createProject").onclick = () => {
+    const name = document.getElementById("projectInput").value.trim();
+    if (name && !state.projects[name]) {
+      state.projects[name] = {
+        active: "index.html",
+        files: { "index.html": "<!DOCTYPE html>\n<html>\n<body>\n  <h1>" + name + "</h1>\n</body>\n</html>" }
+      };
+      state.currentProject = name;
+      saveAppDataQuiet(); populateProjectDropdown(); renderFiles(); openActiveFile();
+      projectModal.classList.remove("open");
+      document.getElementById("projectInput").value = "";
+    }
+  };
+
+  document.getElementById("deleteProjectBtn").onclick = () => {
+    if (Object.keys(state.projects).length <= 1) return toastMsg("Cannot delete only project!");
+    delete state.projects[state.currentProject];
+    state.currentProject = Object.keys(state.projects)[0];
+    saveAppDataQuiet(); populateProjectDropdown(); renderFiles(); openActiveFile();
+  };
+
+  // Mobile Views
+  function showCode() {
+    document.querySelector(".sidebar").style.display = "none";
+    document.querySelector(".editorArea").style.display = "flex";
+    cmEditor.refresh();
+  }
+  document.getElementById("filesBtn").onclick = () => {
+    document.querySelector(".sidebar").style.display = "flex";
+    document.querySelector(".editorArea").style.display = "none";
+  };
+  document.getElementById("navCode").onclick = showCode;
+  document.getElementById("navFiles").onclick = () => document.getElementById("filesBtn").click();
+  document.getElementById("navTerminal").onclick = () => { showCode(); switchVsCodeTab("Terminal"); };
+
+  loadAppData();
+})();
+</script>
 </body>
 </html>

@@ -403,10 +403,10 @@ Type 'help' to view available commands.</div>
             "WebProject": {
               active: "index.html",
               files: {
-                "index.html": '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>PyMobile Web App</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <div class="container">\n    <h1>Hello from HTML & JS Editor!</h1>\n    <p>Edit HTML, CSS, or JS and hit ▶ Run.</p>\n    <button id="btn">Click Me</button>\n  </div>\n  <script src="script.js"><\/script>\n</body>\n</html>',
-                "style.css": 'body {\n  font-family: system-ui, sans-serif;\n  background: #181825;\n  color: #cdd6f4;\n  display: grid;\n  place-items: center;\n  min-height: 100vh;\n  margin: 0;\n}\n.container {\n  text-align: center;\n  padding: 2rem;\n  background: #1e1e2e;\n  border-radius: 12px;\n  border: 1px solid #313244;\n}\nbutton {\n  padding: 10px 20px;\n  background: #89b4fa;\n  border: 0;\n  border-radius: 6px;\n  font-weight: bold;\n  cursor: pointer;\n}',
-                "script.js": '// JavaScript File\ndocument.getElementById("btn")?.addEventListener("click", () => {\n  alert("Interactive JS Working!");\n});\nconsole.log("Web Application Scripts Loaded.");',
-                "main.py": '# Python Script with NumPy Example\nimport numpy as np\n\narr = np.array([1, 2, 3, 4, 5])\nprint("NumPy Array:", arr)\nprint("Mean:", np.mean(arr))\n'
+                "index.html": '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>Risk Calculator</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <div class="card">\n    <h2>Forex Risk Calculator</h2>\n    <label>Account Balance ($)</label>\n    <input type="number" id="balance" value="1000">\n    <label>Risk (%)</label>\n    <input type="number" id="risk" value="2">\n    <button id="calcBtn">Calculate Risk Amount</button>\n    <div id="resultBox" class="result">Result will appear here</div>\n  </div>\n  <script src="script.js"><\/script>\n</body>\n</html>',
+                "style.css": 'body { font-family: system-ui, sans-serif; background: #181825; color: #cdd6f4; display: grid; place-items: center; min-height: 100vh; margin: 0; }\n.card { background: #1e1e2e; padding: 24px; border-radius: 12px; border: 1px solid #313244; width: 280px; display: flex; flex-direction: column; gap: 10px; }\ninput, button { padding: 10px; border-radius: 6px; border: 1px solid #313244; font-size: 14px; }\ninput { background: #11111b; color: #fff; }\nbutton { background: #89b4fa; color: #11111b; font-weight: bold; cursor: pointer; }\n.result { background: #11111b; padding: 12px; border-radius: 6px; text-align: center; margin-top: 10px; border: 1px solid #313244; font-weight: bold; }',
+                "script.js": 'document.addEventListener("DOMContentLoaded", () => {\n  const calcBtn = document.getElementById("calcBtn");\n  const balanceInput = document.getElementById("balance");\n  const riskInput = document.getElementById("risk");\n  const resultBox = document.getElementById("resultBox");\n\n  if (calcBtn) {\n    calcBtn.addEventListener("click", () => {\n      const balance = parseFloat(balanceInput ? balanceInput.value : 0) || 0;\n      const risk = parseFloat(riskInput ? riskInput.value : 0) || 0;\n      const riskAmount = (balance * (risk / 100)).toFixed(2);\n      resultBox.textContent = `Risk Amount: $${riskAmount}`;\n    });\n  }\n});',
+                "main.py": '# Forex Risk Calculator in Python\ndef calculate_risk(balance, risk_pct):\n    return balance * (risk_pct / 100.0)\n\nbalance = 1000.0\nrisk_pct = 2.0\nprint(f"Account Balance: ${balance:.2f}")\nprint(f"Risk Amount ({risk_pct}%): ${calculate_risk(balance, risk_pct):.2f}")\n'
               }
             }
           }
@@ -466,38 +466,26 @@ Type 'help' to view available commands.</div>
       const btnsGroup = document.createElement("div");
       btnsGroup.className = "fileItemBtns";
 
-      // Rename button
       const renameBtn = document.createElement("button");
       renameBtn.className = "fileIconBtn";
       renameBtn.textContent = "✏️";
       renameBtn.title = "Rename File";
-      renameBtn.onclick = (e) => {
-        e.stopPropagation();
-        renameFile(fname);
-      };
+      renameBtn.onclick = (e) => { e.stopPropagation(); renameFile(fname); };
       btnsGroup.appendChild(renameBtn);
 
-      // Share button
       const shareBtn = document.createElement("button");
       shareBtn.className = "fileIconBtn";
       shareBtn.textContent = "📤";
       shareBtn.title = "Share File";
-      shareBtn.onclick = (e) => {
-        e.stopPropagation();
-        shareSingleFile(fname);
-      };
+      shareBtn.onclick = (e) => { e.stopPropagation(); shareSingleFile(fname); };
       btnsGroup.appendChild(shareBtn);
 
-      // Delete button
       if (Object.keys(proj.files).length > 1) {
         const delBtn = document.createElement("button");
         delBtn.className = "fileIconBtn";
         delBtn.textContent = "🗑️";
         delBtn.title = "Delete File";
-        delBtn.onclick = (e) => {
-          e.stopPropagation();
-          deleteFile(fname);
-        };
+        delBtn.onclick = (e) => { e.stopPropagation(); deleteFile(fname); };
         btnsGroup.appendChild(delBtn);
       }
 
@@ -555,46 +543,28 @@ Type 'help' to view available commands.</div>
     countBadge.textContent = "0";
   }
 
-  // --- FILE OPERATIONS: RENAME, DELETE, SHARE, CREATE ---
   function renameFile(oldName) {
     const proj = getActiveProject();
     if (!proj || !proj.files[oldName]) return;
     const newName = prompt("Enter new filename:", oldName);
     if (!newName || newName.trim() === "" || newName === oldName) return;
     const cleanName = newName.trim();
-    if (proj.files[cleanName] !== undefined) {
-      toastMsg("File with this name already exists!");
-      return;
-    }
+    if (proj.files[cleanName] !== undefined) return toastMsg("File already exists!");
 
     const content = proj.files[oldName];
     delete proj.files[oldName];
     proj.files[cleanName] = content;
-    if (proj.active === oldName) {
-      proj.active = cleanName;
-    }
-    saveAppDataQuiet();
-    renderFiles();
-    openActiveFile();
-    toastMsg(`Renamed to ${cleanName}`);
+    if (proj.active === oldName) proj.active = cleanName;
+    saveAppDataQuiet(); renderFiles(); openActiveFile(); toastMsg(`Renamed to ${cleanName}`);
   }
 
   function deleteFile(fname) {
     const proj = getActiveProject();
-    if (!proj) return;
-    if (Object.keys(proj.files).length <= 1) {
-      toastMsg("Cannot delete the only file!");
-      return;
-    }
+    if (!proj || Object.keys(proj.files).length <= 1) return toastMsg("Cannot delete only file!");
     if (confirm(`Delete ${fname}?`)) {
       delete proj.files[fname];
-      if (proj.active === fname) {
-        proj.active = Object.keys(proj.files)[0];
-      }
-      saveAppDataQuiet();
-      renderFiles();
-      openActiveFile();
-      toastMsg(`Deleted ${fname}`);
+      if (proj.active === fname) proj.active = Object.keys(proj.files)[0];
+      saveAppDataQuiet(); renderFiles(); openActiveFile(); toastMsg(`Deleted ${fname}`);
     }
   }
 
@@ -606,49 +576,31 @@ Type 'help' to view available commands.</div>
 
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: filename,
-          text: content
-        });
-        toastMsg("Shared " + filename);
-        return;
+        await navigator.share({ title: filename, text: content });
+        return toastMsg("Shared " + filename);
       } catch (err) {}
     }
     try {
       await navigator.clipboard.writeText(content);
       toastMsg("Copied code to clipboard!");
-    } catch(err) {
-      downloadCurrentFile();
-    }
+    } catch(err) { downloadCurrentFile(); }
   }
 
   function createNewFile(filename) {
     if (!filename) return;
     filename = filename.trim();
     const proj = getActiveProject();
-    
-    if (proj.files[filename] !== undefined) {
-      toastMsg("File already exists!");
-      return;
-    }
+    if (proj.files[filename] !== undefined) return toastMsg("File already exists!");
 
     let boilerplate = "";
-    if (filename.endsWith(".html")) {
-      boilerplate = '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Page</title>\n</head>\n<body>\n  <h1>New HTML Page</h1>\n</body>\n</html>';
-    } else if (filename.endsWith(".css")) {
-      boilerplate = '/* CSS Stylesheet */\nbody {\n  background-color: #181825;\n  color: #fff;\n}';
-    } else if (filename.endsWith(".js")) {
-      boilerplate = '// JavaScript File\nconsole.log("Initialized ' + filename + '");';
-    } else if (filename.endsWith(".py")) {
-      boilerplate = '# Python Script\nprint("Executing ' + filename + '")';
-    }
+    if (filename.endsWith(".html")) boilerplate = '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Page</title>\n</head>\n<body>\n  <h1>New HTML Page</h1>\n</body>\n</html>';
+    else if (filename.endsWith(".css")) boilerplate = '/* CSS Stylesheet */\nbody { background-color: #181825; color: #fff; }';
+    else if (filename.endsWith(".js")) boilerplate = '// JavaScript File\nconsole.log("Initialized ' + filename + '");';
+    else if (filename.endsWith(".py")) boilerplate = '# Python Script\nprint("Executing ' + filename + '")';
 
     proj.files[filename] = boilerplate;
     proj.active = filename;
-    saveAppDataQuiet();
-    renderFiles();
-    openActiveFile();
-    toastMsg("Created " + filename);
+    saveAppDataQuiet(); renderFiles(); openActiveFile(); toastMsg("Created " + filename);
   }
 
   const fileModal = document.getElementById("fileModal");
@@ -668,7 +620,6 @@ Type 'help' to view available commands.</div>
   document.getElementById("quickCss").onclick = () => createNewFile("style_" + Date.now().toString().slice(-4) + ".css");
   document.getElementById("quickPy").onclick = () => createNewFile("main_" + Date.now().toString().slice(-4) + ".py");
 
-  // VS Code Tabs
   const tabs = {
     Problems: document.getElementById("tabProblems"),
     Output: document.getElementById("tabOutput"),
@@ -694,7 +645,7 @@ Type 'help' to view available commands.</div>
   Object.keys(tabBtns).forEach(k => { tabBtns[k].onclick = () => switchVsCodeTab(k); });
   document.getElementById("portsQuickBtn").onclick = () => switchVsCodeTab("Ports");
 
-  // --- LIVE WEB & VIRTUAL PORTS ENGINE ---
+  // --- LIVE WEB & INLINE VIRTUAL PORTS ENGINE ---
   window.openVirtualPort = function(port) {
     saveAppDataQuiet();
     const proj = getActiveProject();
@@ -705,11 +656,20 @@ Type 'help' to view available commands.</div>
       title.textContent = "🌐 Port :8000 — Live Web Page";
       let html = proj.files["index.html"] || proj.files[proj.active] || "<h1>No HTML Found</h1>";
 
+      // Inline CSS automatically
       if (proj.files["style.css"] && !html.includes("<style>") && html.includes("style.css")) {
         html = html.replace("</head>", `<style>${proj.files["style.css"]}</style></head>`);
       }
+      
+      // Inline JS automatically
       if (proj.files["script.js"] && html.includes("script.js")) {
         html = html.replace("</body>", `<script>${proj.files["script.js"]}<\/script></body>`);
+      }
+
+      // Automatically inline Python scripts to prevent PY0404 src fetch error
+      if (proj.files["main.py"]) {
+        html = html.replace(/<py-script\s+src=["']\.\/main\.py["']\s*><\/py-script>/gi, `<py-script>${proj.files["main.py"]}</py-script>`);
+        html = html.replace(/<script\s+type=["']py["']\s+src=["']\.\/main\.py["']\s*><\/script>/gi, `<script type="py">${proj.files["main.py"]}<\/script>`);
       }
 
       iframe.srcdoc = html;
@@ -727,7 +687,6 @@ Type 'help' to view available commands.</div>
     document.getElementById("previewContainer").classList.remove("open");
   };
 
-  // Run Button Logic
   document.getElementById("runBtn").onclick = () => {
     const proj = getActiveProject();
     if (proj.active.endsWith(".html") || proj.active.endsWith(".css")) {
@@ -743,7 +702,6 @@ Type 'help' to view available commands.</div>
     }
   };
 
-  // Terminal Execution Commands
   function termWrite(msg) {
     const term = document.getElementById("terminalLog");
     term.textContent += "\n" + msg;
@@ -863,7 +821,6 @@ Type 'help' to view available commands.</div>
     document.getElementById("outputLog").textContent = "";
   };
 
-  // Download File to Local Storage
   async function downloadCurrentFile() {
     const proj = getActiveProject();
     if (!proj || !proj.active) return;
@@ -888,7 +845,6 @@ Type 'help' to view available commands.</div>
   document.getElementById("shareBtn").onclick = () => shareSingleFile();
   document.getElementById("downloadBtn").onclick = downloadCurrentFile;
 
-  // Project Switcher
   document.getElementById("projectSelectDropdown").onchange = (e) => {
     saveAppDataQuiet();
     state.currentProject = e.target.value;
@@ -897,7 +853,6 @@ Type 'help' to view available commands.</div>
     populateProjectDropdown(); renderFiles(); openActiveFile();
   };
 
-  // New Project
   const projectModal = document.getElementById("projectModal");
   document.getElementById("newProjectBtn").onclick = () => projectModal.classList.add("open");
   document.getElementById("cancelProject").onclick = () => projectModal.classList.remove("open");
@@ -922,7 +877,6 @@ Type 'help' to view available commands.</div>
     saveAppDataQuiet(); populateProjectDropdown(); renderFiles(); openActiveFile();
   };
 
-  // Mobile Views
   function showCode() {
     document.querySelector(".sidebar").style.display = "none";
     document.querySelector(".editorArea").style.display = "flex";
